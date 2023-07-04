@@ -92,8 +92,8 @@ query = f"""with session_purchase as (SELECT
     (SELECT EP.value.int_value FROM UNNEST(event_params) AS EP WHERE key = 'ga_session_id') as session_id,
     TIMESTAMP_MICROS(MIN(event_timestamp)) AS session_start_time,
     TIMESTAMP_MICROS(MAX(event_timestamp)) AS purchase_time
-FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
-  WHERE
+ FROM `{project_id}.{dataset_id}.{table_id}`
+     WHERE
     event_name IN ('session_start', 'purchase')
   GROUP BY
     user_pseudo_id,
@@ -118,6 +118,55 @@ fig, ax = plt.subplots()
 ax.hist(df['average_time_between_session_purchase'], bins=20)
 
 st.pyplot(fig)
+
+st.write("b. How this time is distributed across items?")
+
+query = f"""with session_purchase as (
+SELECT
+   user_pseudo_id,
+     (SELECT EP.value.int_value FROM UNNEST(event_params) AS EP WHERE key = 'ga_session_id') as session_id,
+    TIMESTAMP_MICROS(MIN(event_timestamp)) AS session_start_time,
+     TIMESTAMP_MICROS(MAX(event_timestamp)) AS purchase_time
+ FROM `{project_id}.{dataset_id}.{table_id}`
+   WHERE
+     event_name IN ('session_start', 'purchase')
+   GROUP BY
+     user_pseudo_id,
+     session_id
+   HAVING
+     COUNT(DISTINCT event_name) = 2),
+     items as (
+SELECT
+    user_pseudo_id,
+    (SELECT EP.value.int_value FROM UNNEST(event_params) AS EP WHERE key = 'ga_session_id') as session_id,
+    items.item_name
+ FROM `{project_id}.{dataset_id}.{table_id}`,
+unnest(items) as items
+  WHERE
+    event_name IN ('purchase')
+    and items.item_name != '(not set)')
+
+SELECT
+   item_name,
+   AVG(TIMESTAMP_DIFF(purchase_time, session_start_time, MINUTE)) AS average_time_between_session_purchase
+ FROM
+   session_purchase as sp join items as i
+   on sp.user_pseudo_id = i.user_pseudo_id 
+   and sp.session_id = i.session_id
+group by item_name
+"""
+
+st.subheader("SQL Query:")
+st.code(query)
+
+df = client.query(query).to_dataframe()
+
+fig, ax = plt.subplots()
+ax.hist(df['average_time_between_session_purchase'], bins=20)
+
+st.pyplot(fig)
+
+
 
 st.write("c.Conversion Rate for Transactions by Device Category and Mobile Brand:")
 
