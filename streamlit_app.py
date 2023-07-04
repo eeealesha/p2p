@@ -54,6 +54,94 @@ paginated_df = df[start_index:end_index]
 st.write("Session Count Data (Descending Order):")
 st.dataframe(paginated_df)
 
+st.write("b.How much time does it take on average to purchase an item?")
+
+query = f"""with session_purchase as (SELECT
+    user_pseudo_id,
+    (SELECT EP.value.int_value FROM UNNEST(event_params) AS EP WHERE key = 'ga_session_id') as session_id,
+    TIMESTAMP_MICROS(MIN(event_timestamp)) AS session_start_time,
+    TIMESTAMP_MICROS(MAX(event_timestamp)) AS purchase_time
+    FROM `{project_id}.{dataset_id}.{table_id}`
+  WHERE
+    event_name IN ('session_start', 'purchase')
+  GROUP BY
+    user_pseudo_id,
+    session_id
+  HAVING
+    COUNT(DISTINCT event_name) = 2)
+
+SELECT
+  AVG(TIMESTAMP_DIFF(purchase_time, session_start_time, MINUTE)) AS average_time_between_session_purchase
+FROM
+  session_purchase"""
+
+st.subheader("SQL Query:")
+st.code(query)
+
+df = client.query(query).to_dataframe()
+
+avg_time = round(df.iloc[0,0],2)
+
+st.write(f"On average it takes {avg_time} minutes to purchase an item")
+
+st.write("b. How this time is distributed across users?")
+
+query = f"""with session_purchase as (SELECT
+    user_pseudo_id,
+    (SELECT EP.value.int_value FROM UNNEST(event_params) AS EP WHERE key = 'ga_session_id') as session_id,
+    TIMESTAMP_MICROS(MIN(event_timestamp)) AS session_start_time,
+    TIMESTAMP_MICROS(MAX(event_timestamp)) AS purchase_time
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE
+    event_name IN ('session_start', 'purchase')
+  GROUP BY
+    user_pseudo_id,
+    session_id
+  HAVING
+    COUNT(DISTINCT event_name) = 2)
+
+SELECT
+  user_pseudo_id,
+  AVG(TIMESTAMP_DIFF(purchase_time, session_start_time, MINUTE)) AS average_time_between_session_purchase
+FROM
+  session_purchase
+group by 
+user_pseudo_id"""
+
+st.subheader("SQL Query:")
+st.code(query)
+
+df = client.query(query).to_dataframe()
+
+st.dataframe(df)
+
+st.write("c.Conversion Rate for Transactions by Device Category and Mobile Brand:")
+
+def calculate_conversion_rate():
+    query = f"""
+    SELECT
+        device.category AS device_category,
+        device.mobile_brand_name AS mobile_brand,
+        COUNT(DISTINCT IF(event_name = 'purchase', user_pseudo_id, NULL)) AS total_purchases,
+        COUNT(DISTINCT IF(event_name = 'view_item', user_pseudo_id, NULL)) AS total_views,
+        SAFE_DIVIDE(COUNT(DISTINCT IF(event_name = 'purchase', user_pseudo_id, NULL)), COUNT(DISTINCT IF(event_name = 'view_item', user_pseudo_id, NULL))) AS conversion_rate
+FROM `{project_id}.{dataset_id}.{table_id}`
+GROUP BY
+        device_category,
+        mobile_brand
+order by conversion_rate
+    """
+
+    # Execute the BigQuery query
+    st.subheader("SQL Query:")
+    st.code(query)
+    return client.query(query).to_dataframe()
+
+# Display the result in the Streamlit app
+df = calculate_conversion_rate()
+
+st.dataframe(df)
+
 # Prepare the SQL query to find the most popular item for organic traffic on desktop
 
 st.write("d.What is the most popular item for organic traffic for desktop platform?")
@@ -102,4 +190,4 @@ st.write(f"Most Popular Item by {selected_order} for {selected_traffic_source} T
 
 df = run_bigquery(selected_device_category, selected_traffic_source, selected_order)
 
-st.table(df)
+st.dataframe(df)
