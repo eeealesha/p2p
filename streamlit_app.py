@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 from google.cloud import bigquery
 from google.oauth2.service_account import Credentials
+import matplotlib.pyplot as plt
 
 # Path to your service account JSON key file
 key_path = "unique-bebop-339511-bedb79f68fdf.json"
@@ -113,7 +114,10 @@ st.code(query)
 
 df = client.query(query).to_dataframe()
 
-st.dataframe(df)
+fig, ax = plt.subplots()
+ax.hist(df['average_time_between_session_purchase'], bins=20)
+
+st.pyplot(fig)
 
 st.write("c.Conversion Rate for Transactions by Device Category and Mobile Brand:")
 
@@ -129,7 +133,7 @@ FROM `{project_id}.{dataset_id}.{table_id}`
 GROUP BY
         device_category,
         mobile_brand
-order by conversion_rate
+order by conversion_rate desc
     """
 
     # Execute the BigQuery query
