@@ -1,17 +1,12 @@
 import streamlit as st
 
-st.set_page_config(
-    page_title="Hello",
-    page_icon="👋",
-)
-
 st.write("# Web Analytic Test Case by Aleksey Gavrilov for p2p.com")
 
 st.markdown(
     """
     **Tasks:**
     **Part 1 - Google Merchant Store**
-    
+
 1. Get access to dataset https://developers.google.com/analytics/bigquery/web-ecommerce-demo-dataset
 2. Please provide SQL queries that solve for the following:
     1. How many sessions does each user create?
