@@ -1,7 +1,5 @@
 import streamlit as st
 
-st.sidebar.success("Select a page above.")
-
 st.write("# Web Analytic Test Case by Aleksey Gavrilov for p2p.com")
 
 st.markdown(
